@@ -1,0 +1,11 @@
+name: apps_web
+title:
+username:
+account: ilastouch
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 4140109
+bundleId: 4604938
+url: https://ilastouch.shinyapps.io/apps_web/
+when: 1621203177.81132
+lastSyncTime: 1621203177.81132

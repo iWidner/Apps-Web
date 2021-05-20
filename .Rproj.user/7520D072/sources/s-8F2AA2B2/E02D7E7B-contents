@@ -1,0 +1,412 @@
+---
+title: "Is COVID-19 the desease of Rich countries"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+runtime: shiny
+resource_files:
+- .RData
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(tidyverse)
+library(xts)
+library(dygraphs)
+library(plotly)
+library(tmap)
+library(shiny)
+```
+
+
+```{r global}
+#################################################
+###########    Importing Data       #############
+#################################################
+#covid_who<-read_csv("covid_WHO.csv")# read_csv("https://covid19.who.int/WHO-COVID-19-global-table-data.csv") # Source: World Health Organization - https://covid19.who.int/table
+pib_capita<-read_csv("pib_percapita.csv") # Source: World Development Indicators - https://data.worldbank.org/indicator/NY.GDP.PCAP.CD
+population<-read_csv("population.csv")    # Source: WDI - https://data.worldbank.org/indicator/SP.POP.TOTL
+tourists<-read_csv("tourismarrival.csv") # Tourists arrival - Source: WDI - https://data.worldbank.org/indicator/ST.INT.ARVL
+country_groups<-read_csv("countriesGroups.csv")
+
+covid_ts<-read_csv("owid-covid-data.csv")  # Time series about COVID - "https://covid.ourworldindata.org/data/owid-covid-data.csv"
+
+
+
+################################################
+###########    Cleanning Data       #############
+#################################################
+population[population == "Russian Federation"] <- "Russia"
+tourists[tourists == "Russian Federation"] <- "Russia"
+country_groups[country_groups == "Russian Federation"] <- "Russia"
+pib_capita[pib_capita == "Russian Federation"] <- "Russia"
+
+
+
+pib_capita19<-pib_capita%>%  # PIB per capita in 2019
+  mutate(PIBcapita=`2019`)%>%
+  select(`Country Name`,`Country Code`,PIBcapita)
+
+population19<-population%>%  # Population in 2019
+  mutate(Population=`2019`)%>%
+  select(`Country Name`,`Country Code`,Population)
+
+tourists19<-tourists%>%  # Tourists arrival in 2019
+  mutate(Tourists=`2019`)%>%
+  select(`Country Name`,`Country Code`,Tourists)
+
+country_groups<-country_groups%>%
+  rename(`Country Name`=TableName)
+
+
+dfts<-covid_ts%>% # Variables from a data frame of time series
+  group_by(location)%>%
+  summarise(HDI=tail(human_development_index,1),
+            `Population older than 65 years (%)`=tail(aged_65_older,1),
+            `Population older than 70 years (%)`=tail(aged_70_older,1),
+            Vaccinated_people=sum(people_vaccinated,na.rm = TRUE),Cases=tail(total_cases,1),Deaths=tail(total_deaths,1))%>%
+  rename("Country Name"="location")
+#####################################################################
+
+
+####################################################
+############## Merging tibbles #####################
+df_wdi<-inner_join(inner_join(inner_join(pib_capita19,population19,by="Country Name"),tourists19,by="Country Name"),country_groups,by="Country Name")
+
+df<-inner_join(inner_join(inner_join(inner_join(dfts,pib_capita19,by="Country Name"),
+                      population19,by="Country Code"),
+           tourists19,by="Country Code"),
+           country_groups,by="Country Code")
+
+
+######### Eliminating duplicated columns of country codes ##########
+df<-df%>%
+  rename(`Country Name`=`Country Name.x`)%>%
+  select(`Country Code`,`Country Name`, Region,IncomeGroup,Cases,Deaths,Population,PIBcapita,Tourists,HDI,Vaccinated_people,`Population older than 65 years (%)`,`Population older than 70 years (%)`)
+
+
+########################################################
+######## Creating new variables #######################
+df<-df%>%
+  mutate(`Cases rate`=Cases/Population,`Deaths rate`=Deaths/Population,`Tourists rate`=Tourists/Population,`Rate of vaccinated people`=Vaccinated_people/Population)%>%
+  rename(`PIB per capita (current USD)`=PIBcapita,`Income level`=IncomeGroup)
+
+
+###########################################################
+###### Adding geospacial data to the other variables ######
+data("World")
+dfworld<-World
+df_world<-dfworld%>%
+  rename(`Country Name`=name,`Country Code`=iso_a3)
+  
+df_world<-inner_join(df_world,df,by="Country Code")%>%
+  rename(`Country Name`=`Country Name.x`)
+
+```
+
+Socioeconomic {data-vertical_layout=fill}
+=====================================
+
+
+Column {.sidebar data-width=250}
+-----------------------------------------------------------------------
+
+To compare COVID-19 cases with a socioeconomic variable, select a variable bellow:
+
+
+```{r}
+
+ selectInput("Covid", label = "COVID-19 indicators", 
+    choices =c("Cases rate","Deaths rate","Rate of vaccinated people"), selected = "Cases rate"
+               )
+```
+
+```{r}
+
+ selectInput("Variables", label = "Variables to compare with COVID-19 cases", 
+    choices =c("Tourists rate","PIB per capita (current USD)","HDI","Population older than 65 years (%)","Population older than 70 years (%)"), selected = "PIB per capita (current USD)"
+               )
+```
+
+
+It is interesting in terms of information that can be visualized, when considering country groups, while comparing the rate of COVID-19 cases with socioeconomic variables. Considering country groups allow to verify if the rate of COVID-19 cases in a country can be explained by the group to which it belongs. To select a type of country group, click bellow:
+```{r}
+selectInput("Groups", label = "Groups of countries", 
+    choices =c("Income level","Region"), selected = "Region")
+
+
+```
+
+
+
+
+Row {data-height=350}
+----------------------------------
+
+### Figure 1
+
+
+
+```{r}
+#tmap_options(bg.color = "black", legend.text.color = "white")
+renderTmap(
+  qtm(df_world, fill = input$Covid,fill.palette="Blues")+tmap_style("white")#"RdYlGn"
+  
+
+#tm_shape(df_world) +
+#    tm_polygons(input$Covid, palette="-Blues", contrast=.7)+
+ # tm_bubbles(input$Variables,
+  #           border.col = "black", border.alpha = .5, 
+   #            style="fixed", breaks=c(-Inf, seq(0, 6, by=2), Inf),
+    #           palette="-RdYlBu", contrast=1)#+
+  #tm_compass(type="radar",position="top") #+ tm_scale_bar()
+  #tm_style_gray()+
+  #tm_format_World_wide()
+  #tmap_options(bg.color = "black", legend.text.color = "white")
+    )
+
+
+
+```
+
+
+ 
+### Table 1 - Selected data
+```{r}
+
+renderTable(
+  as.tibble(df_world)%>%
+    select(`Country Name`,input$Groups,input$Covid,input$Variables)
+)
+
+```
+
+
+
+Row {data-height=350}
+----------------------------------
+
+
+### Figure 2
+
+
+```{r}
+
+
+renderPlot(
+  df%>%
+  ggplot(aes(x = get(input$Covid), y = get(input$Variables)))+
+ geom_point(aes(color = get(input$Groups)),size=5)+#
+  geom_smooth(method='lm',se=F,size=1.5)+
+  xlab(colnames(df[,input$Covid]))+ylab(input$Variables)+
+  ggtitle(paste("COVID-19",input$Covid,"compared to",input$Variables))+
+   
+  theme_classic()+
+   theme(legend.position = "top",legend.title = element_blank())
+)
+
+```
+
+
+
+### Figure 3
+
+```{r}
+#mainPanel(
+renderPlotly(
+  df%>%
+    group_by(get(input$Groups))%>%
+    summarise(Mean=as.numeric(mean(na.omit(get(input$Covid)),na.rm=T)))%>%
+  mutate(id=1:length(Mean))%>%
+  filter(id<max(id))%>%
+    plot_ly(y=~Mean,
+            x=~as_vector(as.data.frame(table(df[[input$Groups]]))[,1]),
+            color=~as_vector(as.data.frame(table(df[[input$Groups]]))[,1]),
+            type = "bar"   )%>%hide_legend()%>%
+  
+   layout(title = paste("Mean of",colnames(df[,input$Covid]),"by",colnames(df[,input$Groups])), 
+          xaxis = list(title=colnames(df[,input$Groups])),
+          yaxis =list(title="Mean") )
+  
+    
+
+)
+#)
+
+
+```
+
+
+
+
+Country Profile {data-vertical_layout=scroll}
+=====================================
+
+
+
+```{r}
+
+
+countries<-covid_ts%>%
+  select(location)%>%
+  count(location)
+```
+
+Column {.sidebar}
+-----------------------------------------------------------------------
+
+This page present the profile of each country regarding COVID-19. To choose a country, you have to select it bellow.
+
+```{r}
+selectInput("countries", label = "Country", 
+    choices =c(countries$location)#, selected = "Haiti"
+                   )
+```
+
+***
+***
+
+```{r}
+
+renderText(
+ paste("PIB per capita",": ",
+as.tibble(df_world)%>%
+  mutate(log=df_world["Country Name"]==input$countries)%>%
+  filter(log=="TRUE")%>%
+  select("PIB per capita (current USD)")%>%as_vector()%>%round(digits=2),
+"USD"
+)
+)
+```
+
+***
+```{r}
+renderText(
+ paste("Human Development Index",": ",
+as.tibble(df_world)%>%
+  mutate(log=df_world["Country Name"]==input$countries)%>%
+  filter(log=="TRUE")%>%
+  select("HDI")%>%as_vector()%>%round(digits=4)
+)
+)
+
+```
+
+***
+```{r}
+
+renderText(
+ paste("Population",": ",
+as.tibble(df_world)%>%
+  mutate(log=df_world["Country Name"]==input$countries)%>%
+  filter(log=="TRUE")%>%
+  select("Population")%>%as_vector()%>%round(digits=4)
+)
+)
+
+```
+
+***
+```{r}
+renderText(
+ paste("COVID-19 cases",": ",
+as.tibble(df_world)%>%
+  mutate(log=df_world["Country Name"]==input$countries)%>%
+  filter(log=="TRUE")%>%
+  select("Cases")%>%as_vector()%>%round(digits=4)
+)
+)
+
+```
+
+***
+
+```{r}
+renderText(
+ paste("COVID-19 deaths",": ",
+as.tibble(df_world)%>%
+  mutate(log=df_world["Country Name"]==input$countries)%>%
+  filter(log=="TRUE")%>%
+  select("Deaths")%>%as_vector()%>%round(digits=4)
+)
+)
+
+```
+
+***
+
+```{r}
+renderText(
+ paste("Vaccinated people",": ",
+as.tibble(df_world)%>%
+  mutate(log=df_world["Country Name"]==input$countries)%>%
+  filter(log=="TRUE")%>%
+  select("Vaccinated_people")%>%as_vector()%>%round(digits=4)
+)
+)
+
+```
+
+
+Column {data-width=250}
+-----------------------------------------------------------------------
+
+
+
+
+
+```{r}
+renderDygraph(
+  gra_xts(data=covid_ts,country=input$countries,variable='new_cases',ylab="New cases",xlab="Days",main=paste("New cases in",input$countries))%>%
+    dyOptions(colors="blue")%>%
+    dyRangeSelector()
+    
+)
+
+```
+
+
+```{r}
+renderDygraph(
+  gra_xts(data=covid_ts,country=input$countries,variable=c('total_cases',"people_vaccinated"),ylab="Total cases",xlab="Days",main=paste("Total cases of COVID-19, compared to people vaccinated in",input$countries))%>%
+    dyOptions(fillGraph = T,colors=c("blue","green"))%>%
+    dyRangeSelector()
+)
+
+```
+
+Column {data-width=250}
+-----------------------------------------------------------------------
+
+```{r}
+tot<-covid_ts%>%
+  group_by(date)%>%
+  summarise(tot_new_cases=sum(new_cases,na.rm = T),
+            tot_people_vaccinated=sum(people_vaccinated,na.rm = T),
+            tot_total_cases=sum(total_cases,na.rm = T))
+
+
+```
+
+```{r}
+totnewcases<-xts(tot$tot_new_cases,order.by = as.Date.character(tot$date))
+dygraph(totnewcases,ylab="New cases",xlab="Days",main = "New cases of COVID-19 around the world")%>%
+  dyOptions(colors="blue")%>%
+  dyRangeSelector()
+```
+
+```{r}
+totcases<-xts(tot$tot_total_cases,order.by = as.Date.character(tot$date))
+totpeoplevacc<-xts(tot$tot_people_vaccinated,order.by = as.Date.character(tot$date))
+
+
+  dygraph(cbind(Cases=totcases,`People vaccinated`=totpeoplevacc),ylab="Total cases",xlab="Days",main = "Total cases of COVID-19, compared to people vaccinated, around the world")%>%
+    dyRangeSelector()%>%
+    dyOptions(fillGraph = T,colors=c("blue","green"))
+    
+```
+
+
+
+

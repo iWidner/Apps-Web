@@ -1,0 +1,59 @@
+---
+title: "MIGRATION ET PAYS CONCERNES"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(shiny)
+library(plotly)
+library(shinythemes)
+fluidPage(theme = shinytheme("journal"))
+```
+
+```{r}
+setwd("C:/Users/ESM/Videos")
+migration<-read.csv("migration.csv")
+croissance<-read.csv("Croissance1.csv")
+```
+
+Comparaison du Niveau de Migrant et de la Croissance
+==========
+Column {.sidebar}
+---------
+
+```{r}
+selectInput("region", "Choisir la Region Par rapport au stock de Migrant", choices = c("USA","France", "Canada","Brésil", "Chili", "UK" , "Espagne"))
+
+selectInput("var", "Choisir la Region par rapport a la croissance", choices = c("USA","France", "Canada","Brésil", "Chili", "UK" , "Espagne"))
+
+```
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+### Comparaison Stock d'Imigrant et Croissance Economique
+
+```{r}
+renderPlotly(plot_ly(migration, x=~migration[[input$region]], y=~croissance[[input$var]],colors = "red"))
+
+```
+
+### Evolution Stock de Migrant
+
+```{r}
+renderPlotly(plot_ly(migration, x=~migration[[input$region]], col=("green")))
+```
+
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Evolution de la Croissance Economique
+
+```{r}
+renderPlotly(plot_ly(croissance, x=~croissance[[input$var]]))
+
+```

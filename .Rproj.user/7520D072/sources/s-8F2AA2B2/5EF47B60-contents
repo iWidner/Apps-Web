@@ -1,0 +1,134 @@
+---
+title: "GLOBAL ECONOMY GDP GROWTH 2015-2020"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(shiny)
+library(shinythemes)
+library(tmap)
+library(tidyverse)
+library(xts)
+library(plotly)
+library(dygraphs)
+```
+
+```{r date}
+setwd("C:/Users/ESM/Desktop/App")
+data<-read.csv("Croissance eco.csv")
+fluidPage(theme = shinytheme("superhero"))
+```
+
+
+GLOBAL STATISTICS
+==============
+
+
+Row {data-height= 200}
+-----------------------------------
+
+```{r}
+h6("The COVID-19 pandemic resulted in the most severe and synchronized decline in growth rates 
+recorded in the world since World War II. According to current forecasts, more than 
+90 per cent of the world's countries will experience a contraction in per capita gross domestic product (GDP) in 
+2020 - higher than the 85% of countries in recession at the height of the Great Depression. In sub-Saharan Africa, the economic impact of the pandemic has been severe, although 
+the virus did not spread as much as initially expected.1
+ Uncertainty persists, as the health crisis is not 
+not finished. The region cannot let its guard down. There are a lot of resources that need to be 
+to strengthen African health systems and effectively protect staff 
+while ensuring rapid and affordable health care for citizens.")
+
+
+renderDygraph(dygraph(data, x=~data[[input$pays]]))
+```
+
+### Tableau Representatifs de l'evolution de la croiisance des pays pour les periodes indiques.
+
+```{r}
+renderDataTable(data)
+
+mainPanel(h2("Change in Economic Growth According Selected Country "))
+
+renderPlotly(plot_ly(data, x=~data[[input$pays]]))
+```
+
+
+
+ECONOMY
+===========
+
+```{r}
+h5("Depuis la fin de 2019 l'evolution de la croissance des pays commence a diminuer. toutefois il n'ya pas d'autre explication que l'effet du pendemie affecte negativement li niveau de production des pays.")
+```
+
+Row {data-height= 200}
+-------------------------------------------
+```{r}
+selectInput("pays", "", choices = c("USA","Chine","Haïti", "Italie", "France", "Espagne","Japon", "Canada"))
+renderPlotly(plot_ly(dat, x=~dat[[input$pays]],color = "red"))
+```
+
+
+Row {data-height= 200}
+-----------------------------------
+
+```{r}
+dat<-data
+mainPanel("Select another Country to Compare")
+selectInput("var", "", choices = c("USA","Chine","Haïti", "Italie", "France", "Espagne","Japon", "Canada"))
+renderPlotly(plot_ly(dat, x=~dat[[input$var]],color = "red"))
+
+```
+
+
+
+COUNTRY PROFILE
+===================
+Row {data-height= 200}
+----------------------------------
+
+```{r}
+mainPanel("Select another Country to Compare")
+selectInput("var", "", choices = c("USA","Chine","Haïti", "Italie", "France", "Espagne","Japon", "Canada"))
+renderPlot(plot(data, x=~data[[input$pays]]))
+```
+
+```{r}
+plot(data$Monde)
+plot(data$USA)
+plot(data$Chine)
+plot(data$Haïti)
+plot(data$Italie)
+```
+
+Row {data-height= 200}
+------------------------------------
+
+```{r}
+h4("On peut constater la croissance de tout les pays suivants on tandances a diminuer aucours de la 4e periode sois l'annes 2019")
+```
+
+
+INFORMATION/CONTACTS
+===============
+
+    Telephone: +509 3321323
+    Mail: widnerlafleur@gmail.com
+  
+    ```{R}
+    h4("Ce projet a ete realise dans l'optique de permet a l'utiliser de jouer avec les donnees afin de comparer l'evolution de la croissance econmique des pays.")
+    ```
+
+-------------------------------------
+    Realise par:
+    LAFLEUR Pierre-Widner
+    Moise Gracita Emie
+    INNOCENT Maika Smine")
+    
+    
+  

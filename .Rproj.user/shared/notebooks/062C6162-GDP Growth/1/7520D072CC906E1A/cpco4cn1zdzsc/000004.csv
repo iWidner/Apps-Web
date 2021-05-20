@@ -1,0 +1,394 @@
+"0","data
+"
+"1","function (..., list = character(), package = NULL, lib.loc = NULL, 
+"
+"1","    verbose = getOption(""verbose""), envir = .GlobalEnv, 
+"
+"1","    overwrite = TRUE) 
+"
+"1","{
+"
+"1","    fileExt <- function(x) {
+"
+"1","        db <- grepl(""\\.[^.]+\\.(gz|bz2|xz)$"", x)
+"
+"1","        ans <- sub("".*\\."", """", x)
+"
+"1","        ans[db] <- sub("".*\\.([^.]+\\.)(gz|bz2|xz)$"", ""\\1\\2"", 
+"
+"1","            x[db])
+"
+"1","        ans
+"
+"1","    }
+"
+"1","    my_read_table <- function(...) {
+"
+"1","        lcc <- Sys.getlocale(""LC_COLLATE"")
+"
+"1","        on.exit(Sys.setlocale(""LC_COLLATE"", lcc))
+"
+"1","        Sys.setlocale(""LC_COLLATE"", ""C"")
+"
+"1","        read.table(...)
+"
+"1","    }
+"
+"1","    names <- c(as.character(substitute(list(...))[-1L]), list)
+"
+"1","    if (!is.null(package)) {
+"
+"1","        if (!is.character(package)) 
+"
+"1","            stop(""'package' must be a character string or NULL"")
+"
+"1","        if (FALSE) {
+"
+"1","            if (any(package %in% ""base"")) 
+"
+"1","                warning(""datasets have been moved from package 'base' to package 'datasets'"")
+"
+"1","            if (any(package %in% ""stats"")) 
+"
+"1","                warning(""datasets have been moved from package 'stats' to package 'datasets'"")
+"
+"1","            package[package %in% c(""base"", ""stats"")] <- ""datasets""
+"
+"1","        }
+"
+"1","    }
+"
+"1","    paths <- find.package(package, lib.loc, verbose = verbose)
+"
+"1","    if (is.null(lib.loc)) 
+"
+"1","        paths <- c(path.package(package, TRUE), if (!length(package)) getwd(), 
+"
+"1","            paths)
+"
+"1","    paths <- unique(normalizePath(paths[file.exists(paths)]))
+"
+"1","    paths <- paths[dir.exists(file.path(paths, ""data""))]
+"
+"1","    dataExts <- tools:::.make_file_exts(""data"")
+"
+"1","    if (length(names) == 0L) {
+"
+"1","        db <- matrix(character(), nrow = 0L, ncol = 4L)
+"
+"1","        for (path in paths) {
+"
+"1","            entries <- NULL
+"
+"1","            packageName <- if (file_test(""-f"", file.path(path, 
+"
+"1","                ""DESCRIPTION""))) 
+"
+"1","                basename(path)
+"
+"1","            else "".""
+"
+"1","            if (file_test(""-f"", INDEX <- file.path(path, 
+"
+"1","                ""Meta"", ""data.rds""))) {
+"
+"1","                entries <- readRDS(INDEX)
+"
+"1","            }
+"
+"1","            else {
+"
+"1","                dataDir <- file.path(path, ""data"")
+"
+"1","                entries <- tools::list_files_with_type(dataDir, 
+"
+"1","                  ""data"")
+"
+"1","                if (length(entries)) {
+"
+"1","                  entries <- unique(tools::file_path_sans_ext(basename(entries)))
+"
+"1","                  entries <- cbind(entries, """")
+"
+"1","                }
+"
+"1","            }
+"
+"1","            if (NROW(entries)) {
+"
+"1","                if (is.matrix(entries) && ncol(entries) == 2L) 
+"
+"1","                  db <- rbind(db, cbind(packageName, dirname(path), 
+"
+"1","                    entries))
+"
+"1","                else warning(gettextf(""data index for package %s is invalid and will be ignored"", 
+"
+"1","                  sQuote(packageName)), domain = NA, call. = FALSE)
+"
+"1","            }
+"
+"1","        }
+"
+"1","        colnames(db) <- c(""Package"", ""LibPath"", ""Item"", 
+"
+"1","            ""Title"")
+"
+"1","        footer <- if (missing(package)) 
+"
+"1","            paste0(""Use "", sQuote(paste(""data(package ="", 
+"
+"1","                "".packages(all.available = TRUE))"")), ""\n"", 
+"
+"1","                ""to list the data sets in all *available* packages."")
+"
+"1","        else NULL
+"
+"1","        y <- list(title = ""Data sets"", header = NULL, results = db, 
+"
+"1","            footer = footer)
+"
+"1","        class(y) <- ""packageIQR""
+"
+"1","        return(y)
+"
+"1","    }
+"
+"1","    paths <- file.path(paths, ""data"")
+"
+"1","    for (name in names) {
+"
+"1","        found <- FALSE
+"
+"1","        for (p in paths) {
+"
+"1","            tmp_env <- if (overwrite) 
+"
+"1","                envir
+"
+"1","            else new.env()
+"
+"1","            if (file_test(""-f"", file.path(p, ""Rdata.rds""))) {
+"
+"1","                rds <- readRDS(file.path(p, ""Rdata.rds""))
+"
+"1","                if (name %in% names(rds)) {
+"
+"1","                  found <- TRUE
+"
+"1","                  if (verbose) 
+"
+"1","                    message(sprintf(""name=%s:\t found in Rdata.rds"", 
+"
+"1","                      name), domain = NA)
+"
+"1","                  thispkg <- sub("".*/([^/]*)/data$"", ""\\1"", 
+"
+"1","                    p)
+"
+"1","                  thispkg <- sub(""_.*$"", """", thispkg)
+"
+"1","                  thispkg <- paste0(""package:"", thispkg)
+"
+"1","                  objs <- rds[[name]]
+"
+"1","                  lazyLoad(file.path(p, ""Rdata""), envir = tmp_env, 
+"
+"1","                    filter = function(x) x %in% objs)
+"
+"1","                  break
+"
+"1","                }
+"
+"1","                else if (verbose) 
+"
+"1","                  message(sprintf(""name=%s:\t NOT found in names() of Rdata.rds, i.e.,\n\t%s\n"", 
+"
+"1","                    name, paste(names(rds), collapse = "","")), 
+"
+"1","                    domain = NA)
+"
+"1","            }
+"
+"1","            if (file_test(""-f"", file.path(p, ""Rdata.zip""))) {
+"
+"1","                warning(""zipped data found for package "", 
+"
+"1","                  sQuote(basename(dirname(p))), "".\nThat is defunct, so please re-install the package."", 
+"
+"1","                  domain = NA)
+"
+"1","                if (file_test(""-f"", fp <- file.path(p, 
+"
+"1","                  ""filelist""))) 
+"
+"1","                  files <- file.path(p, scan(fp, what = """", 
+"
+"1","                    quiet = TRUE))
+"
+"1","                else {
+"
+"1","                  warning(gettextf(""file 'filelist' is missing for directory %s"", 
+"
+"1","                    sQuote(p)), domain = NA)
+"
+"1","                  next
+"
+"1","                }
+"
+"1","            }
+"
+"1","            else {
+"
+"1","                files <- list.files(p, full.names = TRUE)
+"
+"1","            }
+"
+"1","            files <- files[grep(name, files, fixed = TRUE)]
+"
+"1","            if (length(files) > 1L) {
+"
+"1","                o <- match(fileExt(files), dataExts, nomatch = 100L)
+"
+"1","                paths0 <- dirname(files)
+"
+"1","                paths0 <- factor(paths0, levels = unique(paths0))
+"
+"1","                files <- files[order(paths0, o)]
+"
+"1","            }
+"
+"1","            if (length(files)) {
+"
+"1","                for (file in files) {
+"
+"1","                  if (verbose) 
+"
+"1","                    message(""name="", name, "":\t file= ..."", 
+"
+"1","                      .Platform$file.sep, basename(file), ""::\t"", 
+"
+"1","                      appendLF = FALSE, domain = NA)
+"
+"1","                  ext <- fileExt(file)
+"
+"1","                  if (basename(file) != paste0(name, ""."", 
+"
+"1","                    ext)) 
+"
+"1","                    found <- FALSE
+"
+"1","                  else {
+"
+"1","                    found <- TRUE
+"
+"1","                    zfile <- file
+"
+"1","                    zipname <- file.path(dirname(file), ""Rdata.zip"")
+"
+"1","                    if (file.exists(zipname)) {
+"
+"1","                      Rdatadir <- tempfile(""Rdata"")
+"
+"1","                      dir.create(Rdatadir, showWarnings = FALSE)
+"
+"1","                      topic <- basename(file)
+"
+"1","                      rc <- .External(C_unzip, zipname, topic, 
+"
+"1","                        Rdatadir, FALSE, TRUE, FALSE, FALSE)
+"
+"1","                      if (rc == 0L) 
+"
+"1","                        zfile <- file.path(Rdatadir, topic)
+"
+"1","                    }
+"
+"1","                    if (zfile != file) 
+"
+"1","                      on.exit(unlink(zfile))
+"
+"1","                    switch(ext, R = , r = {
+"
+"1","                      library(""utils"")
+"
+"1","                      sys.source(zfile, chdir = TRUE, envir = tmp_env)
+"
+"1","                    }, RData = , rdata = , rda = load(zfile, 
+"
+"1","                      envir = tmp_env), TXT = , txt = , tab = , 
+"
+"1","                      tab.gz = , tab.bz2 = , tab.xz = , txt.gz = , 
+"
+"1","                      txt.bz2 = , txt.xz = assign(name, my_read_table(zfile, 
+"
+"1","                        header = TRUE, as.is = FALSE), envir = tmp_env), 
+"
+"1","                      CSV = , csv = , csv.gz = , csv.bz2 = , 
+"
+"1","                      csv.xz = assign(name, my_read_table(zfile, 
+"
+"1","                        header = TRUE, sep = "";"", as.is = FALSE), 
+"
+"1","                        envir = tmp_env), found <- FALSE)
+"
+"1","                  }
+"
+"1","                  if (found) 
+"
+"1","                    break
+"
+"1","                }
+"
+"1","                if (verbose) 
+"
+"1","                  message(if (!found) 
+"
+"1","                    ""*NOT* "", ""found"", domain = NA)
+"
+"1","            }
+"
+"1","            if (found) 
+"
+"1","                break
+"
+"1","        }
+"
+"1","        if (!found) {
+"
+"1","            warning(gettextf(""data set %s not found"", sQuote(name)), 
+"
+"1","                domain = NA)
+"
+"1","        }
+"
+"1","        else if (!overwrite) {
+"
+"1","            for (o in ls(envir = tmp_env, all.names = TRUE)) {
+"
+"1","                if (exists(o, envir = envir, inherits = FALSE)) 
+"
+"1","                  warning(gettextf(""an object named %s already exists and will not be overwritten"", 
+"
+"1","                    sQuote(o)))
+"
+"1","                else assign(o, get(o, envir = tmp_env, inherits = FALSE), 
+"
+"1","                  envir = envir)
+"
+"1","            }
+"
+"1","            rm(tmp_env)
+"
+"1","        }
+"
+"1","    }
+"
+"1","    invisible(names)
+"
+"1","}
+"
+"1","<bytecode: 0x00000211088587c0>
+"
+"1","<environment: namespace:utils>
+"
